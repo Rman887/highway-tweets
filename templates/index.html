@@ -5,11 +5,26 @@
     <title>Web Scraper</title>
 </head>
 <body>
-<h2> Web Scraper test - All "a" tags on this project's repository page</h2>
+<h2> Web Scraper test - Scraps a Twitter page</h2>
+
+<p>Instructions:</p>
+<ol>
+    <li> Put your search keywords into
+        <a href="https://twitter.com/search-home" target="_blank"> Twitter's search page</a>.
+    </li>
+    <li> Download this page (<b>Ctrl-S</b> OR <b>Right-click->Save as</b>). </li>
+    <li> Upload the file below. </li>
+</ol>
+
+<form method="post" enctype="multipart/form-data">
+    <input type="file" name="file">
+    <br> <br>
+    <input type="submit" value="Upload">
+</form>
 <ul>
-{% for item in text %}
-    <li>{{ item }}</li>
-{% endfor %}
+    {% for item in items %}
+        <li>{{ item }}</li>
+    {% endfor %}
 </ul>
 </body>
 </html>
