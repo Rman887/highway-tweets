@@ -7,6 +7,7 @@ import requests
 
 import os
 from werkzeug.utils import secure_filename
+import re
 
 UPLOAD_FOLDER = 'scrape_pages'
 ALLOWED_EXTENSIONS = set(['txt', 'html'])
@@ -20,11 +21,54 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def scrape(text):
+def scrape_post(post):
+    print(post)
+    author_name_tag = post.find("strong", {"class": "fullname"})
+    author_username_tag = post.find("span", {"class": "username"})
+    contents_tag = post.find("p", {"class": "tweet-text"})
+    retweets_tag = post.find("button", {"class": "js-actionRetweet"})
+    likes_tag = post.find("button", {"class": "js-actionFavorite"})
+    url_tag = post.find("a", {"class": "tweet-timestamp"})
+
+    print("=====")
+    print(author_name_tag)
+    print(author_username_tag)
+
+    data = {}
+    if author_name_tag and not author_name_tag.is_empty_element:
+        data["author_name"] = author_name_tag.get_text().strip()
+    if author_username_tag and not author_username_tag.is_empty_element:
+        data["author_username"] = author_username_tag.get_text().strip()
+    if contents_tag and not contents_tag.is_empty_element:
+        data["contents"] = contents_tag.get_text().strip()
+    if retweets_tag and not retweets_tag.is_empty_element:
+        data["retweets"] = re.findall(r'\d+', retweets_tag.get_text())
+        if len(data["retweets"]) > 0:
+            data["retweets"] = int(data["retweets"][0])
+        else:
+            data.pop("retweets")
+    if likes_tag and not likes_tag.is_empty_element:
+        data["likes"] = re.findall(r'\d+', likes_tag.get_text())
+        if len(data["likes"]) > 0:
+            data["likes"] = int(data["likes"][0])
+        else:
+            data.pop("likes")
+    if url_tag and not url_tag.is_empty_element and url_tag.has_attr("href"):
+        data["url"] = url_tag["href"].strip()
+
+    return data
+
+
+def scrape_page(text):
     soup = BeautifulSoup(text, "html.parser")
-    links = soup.find_all("div", {"class": "js-tweet-text-container"})
-    items = [x.prettify() for x in links]
+
+    posts = soup.find_all("li", {"class": "stream-item"})
+    items = []
+    for post in posts:
+        if not post.is_empty_element:
+            items.append(scrape_post(post))
     return items
+
 
 @app.route('/', methods=['GET', 'POST'])
 def main_page():
@@ -47,9 +91,10 @@ def main_page():
 
             try:
                 with open(full_path, "r", encoding="utf8") as f:
-                    items = scrape(f.read())
+                    items = scrape_page(f.read())
             except Exception as e:
                 print("Error scraping file: ", e)
+                raise
             else:
                 os.remove(full_path)
 
