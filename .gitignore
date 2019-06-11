@@ -3,3 +3,4 @@ venv/*
 old/credentials.json
 __pycache__/*
 app.pyc
+scrape_pages/*

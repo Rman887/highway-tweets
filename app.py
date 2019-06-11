@@ -1,13 +1,11 @@
-from flask import Flask, render_template, url_for, session, redirect, request, flash
-from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField
+from flask import Flask, render_template, url_for, session, redirect, request, flash, send_from_directory
 
 from bs4 import BeautifulSoup
-import requests
 
 import os
 from werkzeug.utils import secure_filename
 import re
+import json
 
 UPLOAD_FOLDER = 'scrape_pages'
 ALLOWED_EXTENSIONS = set(['txt', 'html'])
@@ -22,17 +20,12 @@ def allowed_file(filename):
 
 
 def scrape_post(post):
-    print(post)
     author_name_tag = post.find("strong", {"class": "fullname"})
     author_username_tag = post.find("span", {"class": "username"})
     contents_tag = post.find("p", {"class": "tweet-text"})
     retweets_tag = post.find("button", {"class": "js-actionRetweet"})
     likes_tag = post.find("button", {"class": "js-actionFavorite"})
     url_tag = post.find("a", {"class": "tweet-timestamp"})
-
-    print("=====")
-    print(author_name_tag)
-    print(author_username_tag)
 
     data = {}
     if author_name_tag and not author_name_tag.is_empty_element:
@@ -73,8 +66,17 @@ def scrape_page(text):
 @app.route('/', methods=['GET', 'POST'])
 def main_page():
 
-    items = []
+    data = []
     if request.method == 'POST':
+        session["filename"] = None
+        for f in os.listdir(app.config["UPLOAD_FOLDER"]):
+            fp = os.path.join(app.config["UPLOAD_FOLDER"], f)
+            try:
+                if os.path.isfile(fp):
+                    os.remove(fp)
+            except Exception as e:
+                print(e)
+
         if 'file' not in request.files:
             flash("File part missing")
             return redirect(request.url)
@@ -86,19 +88,33 @@ def main_page():
 
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
+            session["filename"] = filename
             full_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(full_path)
 
             try:
                 with open(full_path, "r", encoding="utf8") as f:
-                    items = scrape_page(f.read())
+                    data = scrape_page(f.read())
+
+                data_full_path = os.path.join(app.config['UPLOAD_FOLDER'], "data-" + filename + ".json")
+                with open(data_full_path, "w") as f:
+                    f.write(json.dumps(session.get("data")))
             except Exception as e:
                 print("Error scraping file: ", e)
                 raise
             else:
                 os.remove(full_path)
 
-    return render_template('index.html', items=items)
+    return render_template('index.html', items=data)
+
+
+@app.route('/download')
+def download_file():
+    print("d reached", session)
+    if session.get("filename", None):
+        print("saving")
+        return send_from_directory(app.config['UPLOAD_FOLDER'], "data-" + session.get("filename") + ".json", as_attachment=True)
+    return redirect(url_for("main_page"))
 
 
 if __name__ == '__main__':
